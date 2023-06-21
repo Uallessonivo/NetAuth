@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.IdentityModel.Tokens;
 using NetAuth.Dtos;
 using NetAuth.Models;
@@ -12,7 +13,7 @@ namespace NetAuth.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        public static User User = new User();
+        public static User user = new User();
         private readonly IConfiguration _configuration;
 
         public AuthController(IConfiguration configuration)
@@ -20,57 +21,66 @@ namespace NetAuth.Controllers
             _configuration = configuration;
         }
 
+        [HttpGet("me"), Authorize]
+        public ActionResult<string> GetMyName()
+        {
+            var userName = User.Identity?.Name;
+            var roleClaims = User.FindAll(ClaimTypes.Role);
+
+            var roles = roleClaims?.Select(c => c.Value).ToList();
+
+            return Ok(new { userName, roles });
+        }
+
         [HttpPost("register")]
         public ActionResult<User> Register(UserDto requrest)
         {
             string passwordHash = BCrypt.Net.BCrypt.HashPassword(requrest.Password);
 
-            User.UserName = requrest.UserName;
-            User.PasswordHash = passwordHash;
+            user.UserName = requrest.UserName;
+            user.PasswordHash = passwordHash;
 
-            return Ok(User);
+            return Ok(user);
         }
 
         [HttpPost("login")]
         public ActionResult<string> Login(UserDto requrest)
         {
-            if (User.UserName != requrest.UserName)
+            if (user.UserName != requrest.UserName)
             {
                 return BadRequest("User not found.");
 
             }
 
-            if (!BCrypt.Net.BCrypt.Verify(requrest.Password, User.PasswordHash))
+            if (!BCrypt.Net.BCrypt.Verify(requrest.Password, user.PasswordHash))
             {
                 return BadRequest("Wrong email or password");
             }
 
-            string token = CreateToken(User);
+            string token = CreateToken(user);
 
             return Ok(token);
         }
 
         private string CreateToken(User user)
         {
-            List<Claim> claims = new List<Claim>
-            {
+            List<Claim> claims = new List<Claim> {
                 new Claim(ClaimTypes.Name, user.UserName),
-                new Claim(ClaimTypes.Role, "Admin"),
                 new Claim(ClaimTypes.Role, "User"),
             };
 
-            var key = new SymmetricSecurityKey(
-                Encoding.UTF8.GetBytes(_configuration.GetSection("AppSettings:Token").Value!));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(
+                _configuration.GetSection("AppSettings:Token").Value!));
 
-            var cred = new SigningCredentials(key, SecurityAlgorithms.HmacSha512Signature);
+            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
 
             var token = new JwtSecurityToken(
-                claims: claims,
-                expires: DateTime.Now.AddDays(1),
-                signingCredentials: cred
-            );
+                    claims: claims,
+                    expires: DateTime.Now.AddDays(1),
+                    signingCredentials: creds
+                );
 
-            var jwt = new JwtSecurityTokenHandler().WriteToken(token);
+            string jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
             return jwt;
         }

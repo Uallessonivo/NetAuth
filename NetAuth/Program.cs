@@ -11,7 +11,6 @@ builder.Services.AddControllers();
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 
-
 // Enabling the Authorization in Swagger Ui
 builder.Services.AddSwaggerGen(options =>
 {

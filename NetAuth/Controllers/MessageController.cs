@@ -11,7 +11,7 @@ namespace NetAuth.Controllers
     {
         private static readonly Message Message = new();
 
-        [HttpGet("/send"), Authorize(Roles = "Admin,User")]
+        [HttpPost("/send"), Authorize(Roles = "Admin")]
         public ActionResult<Message> SendMessage(MessageDto request)
         {
             Message.Content = request.ContentBody;
