@@ -4,13 +4,14 @@ using NetAuth.Exceptions;
 using NetAuth.Models;
 using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Security.Cryptography;
 using System.Text;
 
 namespace NetAuth.Services
 {
     public class AuthService : IAuthService
     {
-        public static User user = new User();
+        private static User _user = new User();
         private readonly IConfiguration _configuration;
 
         public AuthService(IConfiguration configuration)
@@ -18,10 +19,38 @@ namespace NetAuth.Services
             _configuration = configuration;
         }
 
+        public string Login(UserDto userDto)
+        {
+            if (_user.UserName != userDto.UserName)
+            {
+                throw new UserNotFoundException("User not found.");
+            }
+
+            if (!BCrypt.Net.BCrypt.Verify(userDto.Password, _user.PasswordHash))
+            {
+                throw new InvalidCredentialsException("Invalid Credentials.");
+            }
+
+            string token = CreateToken(_user);
+
+            return token;
+        }
+
+        public User Register(UserDto userDto)
+        {
+            string passwordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
+
+            _user.UserName = userDto.UserName;
+            _user.PasswordHash = passwordHash;
+
+            return _user;
+        }
+
         public string CreateToken(User user)
         {
-            List<Claim> claims = new List<Claim> {
-                new Claim(ClaimTypes.Name, user.UserName),
+            List<Claim> claims = new List<Claim>
+            {
+                new Claim(ClaimTypes.Name, AuthService._user.UserName),
                 new Claim(ClaimTypes.Role, "User"),
             };
 
@@ -31,42 +60,56 @@ namespace NetAuth.Services
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256Signature);
 
             var token = new JwtSecurityToken(
-                    claims: claims,
-                    expires: DateTime.Now.AddDays(1),
-                    signingCredentials: creds
-                );
+                claims: claims,
+                expires: DateTime.Now.AddDays(1),
+                signingCredentials: creds
+            );
 
             string jwt = new JwtSecurityTokenHandler().WriteToken(token);
 
             return jwt;
         }
 
-        public string Login(UserDto userDto)
+        public RefreshToken GenerateRefreshToken()
         {
-            if (user.UserName != userDto.UserName)
+            var refreshToken = new RefreshToken
             {
-                throw new UserNotFoundException("User not found.");
+                Token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(64)),
+                Expires = DateTime.Now.AddHours(2)
+            };
 
-            }
-
-            if (!BCrypt.Net.BCrypt.Verify(userDto.Password, user.PasswordHash))
-            {
-                throw new InvalidCredentialsException("Invalid Credentials.");
-            }
-
-            string token = CreateToken(user);
-
-            return token;
+            return refreshToken;
         }
 
-        public User Register(UserDto userDto)
+        public CookieOptions SetRefreshToken(RefreshToken refreshToken)
         {
-            string passwordHash = BCrypt.Net.BCrypt.HashPassword(userDto.Password);
+            var cookieOptions = new CookieOptions
+            {
+                HttpOnly = true,
+                Expires = refreshToken.Expires,
+            };
 
-            user.UserName = userDto.UserName;
-            user.PasswordHash = passwordHash;
+            _user.RefreshToken = refreshToken.Token;
+            _user.TokenCreated = refreshToken.Created;
+            _user.TokenExpires = refreshToken.Expires;
 
-            return user;
+            return cookieOptions;
+        }
+
+        public string RefreshToken(string newRefreshToken)
+        {
+            if (!_user.RefreshToken.Equals(newRefreshToken))
+            {
+                throw new UnauthorizedException("Invalid Refresh Token");
+            }
+            else if (_user.TokenExpires < DateTime.Now)
+            {
+                throw new UnauthorizedException("Token Expired");
+            }
+
+            string token = CreateToken(_user);
+            
+            return token;
         }
     }
 }

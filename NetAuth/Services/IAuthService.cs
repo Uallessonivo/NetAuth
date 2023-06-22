@@ -1,4 +1,5 @@
-﻿using NetAuth.Dtos;
+﻿using Microsoft.AspNetCore.Mvc;
+using NetAuth.Dtos;
 using NetAuth.Models;
 
 namespace NetAuth.Services
@@ -8,5 +9,8 @@ namespace NetAuth.Services
         User Register(UserDto userDto);
         string Login(UserDto userDto);
         string CreateToken(User user);
+        RefreshToken GenerateRefreshToken();
+        CookieOptions SetRefreshToken(RefreshToken refreshToken);
+        string RefreshToken(string newRefreshToken);
     }
 }

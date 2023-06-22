@@ -4,6 +4,7 @@ using NetAuth.Dtos;
 using NetAuth.Models;
 using NetAuth.Services;
 using System.Security.Claims;
+using System.Security.Cryptography;
 
 namespace NetAuth.Controllers
 {
@@ -11,9 +12,9 @@ namespace NetAuth.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly AuthService _authService;
+        private readonly IAuthService _authService;
 
-        public AuthController(AuthService authService)
+        public AuthController(IAuthService authService)
         {
             _authService = authService;
         }
@@ -30,15 +31,36 @@ namespace NetAuth.Controllers
         }
 
         [HttpPost("register")]
-        public ActionResult<User> Register(UserDto requrest)
+        public ActionResult<User> Register(UserDto request)
         {
-            return Ok(_authService.Register(requrest));
+            return Ok(_authService.Register(request));
         }
 
         [HttpPost("login")]
-        public ActionResult<string> Login(UserDto requrest)
+        public ActionResult<string> Login([FromBody] UserDto request)
         {
-            return Ok(_authService.Login(requrest));
+            var token = _authService.Login(request);
+
+            var refreshToken = _authService.GenerateRefreshToken();
+            var cookieOptions = _authService.SetRefreshToken(refreshToken);
+
+            Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
+
+            return Ok(token);
+        }
+        
+        [HttpPost("refresh-token")]
+        public ActionResult<string> RefreshToken()
+        {
+            var refreshToken = Request.Cookies["refreshToken"]!;
+            
+            var token = _authService.RefreshToken(refreshToken);
+            var newRefreshToken = _authService.GenerateRefreshToken();
+            var cookieOptions = _authService.SetRefreshToken(newRefreshToken);
+
+            Response.Cookies.Append("refreshToken", newRefreshToken.Token, cookieOptions);
+
+            return Ok(token);
         }
     }
 }
