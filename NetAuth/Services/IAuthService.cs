@@ -10,7 +10,7 @@ namespace NetAuth.Services
         string Login(UserDto userDto);
         string CreateToken(User user);
         RefreshToken GenerateRefreshToken();
-        CookieOptions SetRefreshToken(RefreshToken refreshToken);
+        void SetRefreshToken(RefreshToken refreshToken);
         string RefreshToken(string newRefreshToken);
     }
 }

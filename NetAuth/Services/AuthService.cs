@@ -13,10 +13,12 @@ namespace NetAuth.Services
     {
         private static User _user = new User();
         private readonly IConfiguration _configuration;
+        private readonly IHttpContextAccessor _contextAccessor;
 
-        public AuthService(IConfiguration configuration)
+        public AuthService(IConfiguration configuration, IHttpContextAccessor contextAccessor)
         {
             _configuration = configuration;
+            _contextAccessor = contextAccessor;
         }
 
         public string Login(UserDto userDto)
@@ -81,7 +83,7 @@ namespace NetAuth.Services
             return refreshToken;
         }
 
-        public CookieOptions SetRefreshToken(RefreshToken refreshToken)
+        public void SetRefreshToken(RefreshToken refreshToken)
         {
             var cookieOptions = new CookieOptions
             {
@@ -93,7 +95,7 @@ namespace NetAuth.Services
             _user.TokenCreated = refreshToken.Created;
             _user.TokenExpires = refreshToken.Expires;
 
-            return cookieOptions;
+            _contextAccessor.HttpContext?.Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
         }
 
         public string RefreshToken(string newRefreshToken)

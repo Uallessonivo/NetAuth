@@ -42,9 +42,7 @@ namespace NetAuth.Controllers
             var token = _authService.Login(request);
 
             var refreshToken = _authService.GenerateRefreshToken();
-            var cookieOptions = _authService.SetRefreshToken(refreshToken);
-
-            Response.Cookies.Append("refreshToken", refreshToken.Token, cookieOptions);
+            _authService.SetRefreshToken(refreshToken);
 
             return Ok(token);
         }
@@ -56,9 +54,7 @@ namespace NetAuth.Controllers
             
             var token = _authService.RefreshToken(refreshToken);
             var newRefreshToken = _authService.GenerateRefreshToken();
-            var cookieOptions = _authService.SetRefreshToken(newRefreshToken);
-
-            Response.Cookies.Append("refreshToken", newRefreshToken.Token, cookieOptions);
+            _authService.SetRefreshToken(newRefreshToken);
 
             return Ok(token);
         }
